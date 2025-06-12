@@ -15,3 +15,6 @@ which = { workspace = true }
 [[bin]]
 name = "rwatch"
 path = "src/main.rs"
+
+[profile.release]
+panic = "abort"

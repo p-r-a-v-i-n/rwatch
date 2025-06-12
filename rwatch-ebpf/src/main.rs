@@ -1,8 +1,18 @@
 #![no_std]
 #![no_main]
 
-use aya_ebpf::{macros::tracepoint, programs::TracePointContext};
 use aya_log_ebpf::info;
+use aya_ebpf::{
+    macros::{map, tracepoint},
+    maps::PerfEventArray,
+    programs::TracePointContext,
+};
+
+use rwatch_common::ExecEvent;
+
+
+#[map(name = "EVENTS")]
+static mut EVENTS: PerfEventArray<ExecEvent> = PerfEventArray::new(0);
 
 #[tracepoint]
 pub fn rwatch(ctx: TracePointContext) -> u32 {
