@@ -1,6 +1,17 @@
+mod rule_engine;
+
+use aya::maps::perf::{AsyncPerfEventArray, PerfBufferError};
 use aya::programs::TracePoint;
+use aya::util::online_cpus;
+use bytes::BytesMut;
+use tokio::task;
+
+use rule_engine::RuleEngine;
+
+use rwatch_common::ExecEvent;
+
 #[rustfmt::skip]
-use log::{debug, warn};
+use log::{debug, warn,};
 use tokio::signal;
 
 #[tokio::main]
@@ -34,6 +45,86 @@ async fn main() -> anyhow::Result<()> {
     program.load()?;
     program.attach("syscalls", "sys_enter_execve")?;
 
+    let mut perf_array = AsyncPerfEventArray::try_from(ebpf.take_map("EVENTS").unwrap())?;
+
+    // for cpu in cpus {
+
+    //     let mut buf = perf_array.open(cpu_id, None)?;
+
+    //     task::spawn(async move {
+    //         let mut buffers = (0..10)
+    //             .map(|_| BytesMut::with_capacity(1024))
+    //             .collect::<Vec<_>>();
+
+    //         loop {
+    //             match buf.read_events(&mut buffers).await {
+    //                 Ok(events) => {
+    //                     for i in 0..events.read {
+    //                         let buf = &buffers[i];
+    //                         if buf.len() >= core::mem::size_of::<ExecEvent>() {
+    //                             let ptr = buf.as_ptr() as *const ExecEvent;
+    //                             let event = unsafe { ptr.read_unaligned() };
+    //                             let comm = String::from_utf8_lossy(&event.comm)
+    //                                 .trim_end_matches(char::from(0))
+    //                                 .to_string();
+    //                             info!("Got event: pid={} uid={} comm={}", event.pid, event.uid, comm);
+    //                         }
+    //                     }
+    //                 }
+    //                 Err(e) => {
+    //                     warn!("failed to read events on cpu {}: {}", cpu_id, e);
+    //                 }
+    //             }
+    //         }
+    //     });
+    // }
+    for cpu_id in online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{msg}: {e}"))? {
+        let mut buf = perf_array.open(cpu_id, None)?;
+
+        let rule_engine = RuleEngine::new();
+
+        task::spawn(async move {
+            let mut buffers = (0..10)
+                .map(|_| BytesMut::with_capacity(1024))
+                .collect::<Vec<_>>();
+
+            loop {
+                let events = buf.read_events(&mut buffers).await?;
+
+                for i in 0..events.read {
+                    let buf = &buffers[i];
+
+                    if buf.len() < std::mem::size_of::<ExecEvent>() {
+                        continue;
+                    }
+
+                    // let ptr = buf.as_ptr() as *const ExecEvent;
+
+                    let event = unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ExecEvent) };
+                    println!(
+                        "Event from CPU {}: pid={} uid={} comm={:?}",
+                        cpu_id,
+                        event.pid,
+                        event.uid,
+                        std::str::from_utf8(&event.comm).unwrap_or("<invalid utf8>")
+                    );
+
+                    let alerts = rule_engine.evaluate(&event);
+
+                    for alert in alerts {
+                        println!(
+                            "[ALERT] 🚨 PID={} UID={} COMM={} -- {}",
+                            alert.pid, alert.uid, alert.comm, alert.rule.description
+                        );
+                    }
+                }
+            }
+
+            #[allow(unreachable_code)]
+            Ok::<_, PerfBufferError>(())
+        });
+    }
+
     let ctrl_c = signal::ctrl_c();
     println!("Waiting for Ctrl-C...");
     ctrl_c.await?;
@@ -41,3 +132,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+

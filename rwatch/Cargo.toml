@@ -21,6 +21,7 @@ tokio = { workspace = true, features = [
     "net",
     "signal",
 ] }
+bytes = "1.10.1"
 [build-dependencies]
 anyhow = { workspace = true }
 aya-build = { workspace = true }

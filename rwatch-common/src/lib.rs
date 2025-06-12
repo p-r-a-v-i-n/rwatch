@@ -4,5 +4,5 @@
 pub struct ExecEvent {
     pub pid: u32,
     pub uid: u32,
-    pub comm: [u8; 16], // process name (TASK_COMM_LEN)
+    pub comm: [u8; 16], // process name (TASK_COMM_LEN),
 }

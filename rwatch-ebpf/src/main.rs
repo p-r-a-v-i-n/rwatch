@@ -1,11 +1,15 @@
 #![no_std]
 #![no_main]
 
-use aya_log_ebpf::info;
 use aya_ebpf::{
     macros::{map, tracepoint},
     maps::PerfEventArray,
     programs::TracePointContext,
+};
+use aya_ebpf::helpers::{
+    bpf_get_current_comm,
+    bpf_get_current_pid_tgid,
+    bpf_get_current_uid_gid
 };
 
 use rwatch_common::ExecEvent;
@@ -23,9 +27,27 @@ pub fn rwatch(ctx: TracePointContext) -> u32 {
 }
 
 fn try_rwatch(ctx: TracePointContext) -> Result<u32, u32> {
-    info!(&ctx, "tracepoint sys_enter_execve called");
+
+    let pid_tgid = bpf_get_current_pid_tgid();
+    let pid = (pid_tgid >> 32) as u32;
+
+    let uid_gid = bpf_get_current_uid_gid();
+    let uid = (uid_gid & 0xFFFFFFFF) as u32;
+
+    let comm = bpf_get_current_comm().unwrap_or([0; 16]);
+
+    let event = ExecEvent { pid, uid, comm };
+
+    unsafe {
+        let events = core::ptr::addr_of_mut!(EVENTS);
+        (*events).output(&ctx, &event, 0);
+    }
+
     Ok(0)
 }
+
+
+
 
 #[cfg(not(test))]
 #[panic_handler]
