@@ -101,20 +101,13 @@ async fn main() -> anyhow::Result<()> {
                     // let ptr = buf.as_ptr() as *const ExecEvent;
 
                     let event = unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ExecEvent) };
-                    println!(
-                        "Event from CPU {}: pid={} uid={} comm={:?}",
-                        cpu_id,
-                        event.pid,
-                        event.uid,
-                        std::str::from_utf8(&event.comm).unwrap_or("<invalid utf8>")
-                    );
 
                     let alerts = rule_engine.evaluate(&event);
 
                     for alert in alerts {
                         println!(
-                            "[ALERT] 🚨 PID={} UID={} COMM={} -- {}",
-                            alert.pid, alert.uid, alert.comm, alert.rule.description
+                            "[ALERT] 🚨 PID={} UID={} COMM={} filename={} -- {}",
+                            alert.pid, alert.uid, alert.comm, alert.filename, alert.rule.description
                         );
                     }
                 }
