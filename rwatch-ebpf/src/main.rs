@@ -9,7 +9,8 @@ use aya_ebpf::{
 use aya_ebpf::helpers::{
     bpf_get_current_comm,
     bpf_get_current_pid_tgid,
-    bpf_get_current_uid_gid
+    bpf_get_current_uid_gid,
+    bpf_probe_read_user_str_bytes,
 };
 
 use rwatch_common::ExecEvent;
@@ -27,7 +28,6 @@ pub fn rwatch(ctx: TracePointContext) -> u32 {
 }
 
 fn try_rwatch(ctx: TracePointContext) -> Result<u32, u32> {
-
     let pid_tgid = bpf_get_current_pid_tgid();
     let pid = (pid_tgid >> 32) as u32;
 
@@ -36,15 +36,27 @@ fn try_rwatch(ctx: TracePointContext) -> Result<u32, u32> {
 
     let comm = bpf_get_current_comm().unwrap_or([0; 16]);
 
-    let event = ExecEvent { pid, uid, comm };
+    let filename_ptr: *const u8 = unsafe {
+        ctx.read_at::<*const u8>(16).unwrap_or(core::ptr::null())
+    };
+
+    let mut event = ExecEvent {
+        pid,
+        uid,
+        comm,
+        filename: [0; 256],
+    };
 
     unsafe {
+        let _ = bpf_probe_read_user_str_bytes(filename_ptr, &mut event.filename);
         let events = core::ptr::addr_of_mut!(EVENTS);
         (*events).output(&ctx, &event, 0);
     }
 
     Ok(0)
 }
+
+
 
 
 
