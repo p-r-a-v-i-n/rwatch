@@ -1,5 +1,41 @@
 # rwatch
 
+Real-time Threat Detection using eBPF + Rust
+
+rwatch is an eBPF-based threat detection tool written in Rust. It monitors Linux systems for suspicious or malicious behavior with minimal overhead.
+
+## ✨ Why rwatch?
+- Ultra-low overhead with eBPF
+- Written in Rust for safety & performance
+- Real-time event-driven architecture
+- Easy to extend with custom detection rules
+
+## ✅ Current Capabilities
+- Captures execve events:
+     - pid, uid, process name (comm)
+     - filename, first 2 arguments (argv0, argv1)
+     - Streams captured events via PerfEventArray to user space
+     - CLI logging for basic visibility
+
+## 🔜 Planned Features
+- Detect suspicious behaviors like:
+     - chmod +x on unknown files
+     - Port scanning activity (burst of outbound connections)
+     - Access to sensitive files (/etc/shadow, /root)
+     - Creation of .enc files (possible ransomware indicator)
+     - Fork bombs or rapid exec calls
+- Rule-based detection engine (YAML/JSON rules)
+- Event debouncing (to avoid log spam)
+- Alerting via:
+   - CLI
+   - JSON log file
+   - Optional Webhook integration
+
+
+## Architecture
+<img width="572" height="656" alt="rwatch-arch" src="https://github.com/user-attachments/assets/3be680df-ecf3-4a60-9778-6736d721a0e5" />
+
+
 ## Prerequisites
 
 1. stable rust toolchains: `rustup toolchain install stable`
