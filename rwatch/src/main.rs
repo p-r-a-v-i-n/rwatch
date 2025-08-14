@@ -5,6 +5,7 @@ use aya::programs::TracePoint;
 use aya::util::online_cpus;
 use bytes::BytesMut;
 use tokio::task;
+use colored::Colorize;
 
 use rule_engine::RuleEngine;
 
@@ -24,8 +25,8 @@ fn log_alert(alert: Alert) {
 
     match alert.rule.severity {
         rwatch_common::Severity::Info => info!("[Info]: {}", log_message),
-        rwatch_common::Severity::Warning => warn!("[Info]: {}", log_message),
-        rwatch_common::Severity::Critical => log::error!("[Info]: {}", log_message)
+        rwatch_common::Severity::Warning => warn!("[Warning]: {}".yellow(), log_message),
+        rwatch_common::Severity::Critical => log::error!("[Critical]: {}".red(), log_message)
     }
 }
 
