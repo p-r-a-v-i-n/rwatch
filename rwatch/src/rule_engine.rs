@@ -1,5 +1,5 @@
 use log::info;
-use rwatch_common::ExecEvent;
+use rwatch_common::{ExecEvent, Severity};
 
 #[derive(Debug, Clone)]
 pub enum RuleType {
@@ -11,6 +11,7 @@ pub enum RuleType {
 pub struct Rule {
     pub rule_type: RuleType,
     pub description: String,
+    pub severity: Severity
 }
 
 #[derive(Debug)]
@@ -33,10 +34,12 @@ impl RuleEngine {
                 Rule {
                     rule_type: RuleType::SuspiciousPathPrefix("/tmp".to_string()),
                     description: "Execution from /tmp is suspicious".to_string(),
+                    severity: Severity::Warning
                 },
                 Rule {
                     rule_type: RuleType::SuspiciousCommand("/usr/bin/nmap".to_string()),
                     description: "Port scanning tool detected".to_string(),
+                    severity: Severity::Critical
                 },
             ],
         }

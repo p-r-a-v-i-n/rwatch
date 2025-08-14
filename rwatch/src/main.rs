@@ -14,6 +14,21 @@ use rwatch_common::ExecEvent;
 use log::{debug, warn,};
 use tokio::signal;
 
+use crate::rule_engine::Alert;
+
+fn log_alert(alert: Alert) {
+    let log_message = format!(
+        "PID={} UID={} COMM={} FILENAME={} -- {}",
+        alert.pid, alert.uid, &alert.comm, &alert.filename, &alert.rule.description
+    );
+
+    match alert.rule.severity {
+        rwatch_common::Severity::Info => info!("[Info]: {}", log_message),
+        rwatch_common::Severity::Warning => warn!("[Info]: {}", log_message),
+        rwatch_common::Severity::Critical => log::error!("[Info]: {}", log_message)
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -105,10 +120,7 @@ async fn main() -> anyhow::Result<()> {
                     let alerts = rule_engine.evaluate(&event);
 
                     for alert in alerts {
-                        println!(
-                            "[ALERT] 🚨 PID={} UID={} COMM={} filename={} -- {}",
-                            alert.pid, alert.uid, alert.comm, alert.filename, alert.rule.description
-                        );
+                        log_alert(alert);
                     }
                 }
             }
