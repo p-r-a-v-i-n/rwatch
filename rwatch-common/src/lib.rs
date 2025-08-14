@@ -7,3 +7,9 @@ pub struct ExecEvent {
     pub comm: [u8; 16], // process name (TASK_COMM_LEN),
     pub filename: [u8; 256],
 }
+
+pub enum Severity {
+    Info,
+    Warning,
+    Critical
+}
