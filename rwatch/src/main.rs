@@ -5,6 +5,7 @@ use aya::programs::TracePoint;
 use aya::util::online_cpus;
 use bytes::BytesMut;
 use tokio::task;
+use colored::Colorize;
 
 use rule_engine::RuleEngine;
 
@@ -13,6 +14,21 @@ use rwatch_common::ExecEvent;
 #[rustfmt::skip]
 use log::{debug, warn,};
 use tokio::signal;
+
+use crate::rule_engine::Alert;
+
+fn log_alert(alert: Alert) {
+    let log_message = format!(
+        "PID={} UID={} COMM={} FILENAME={} -- {}",
+        alert.pid, alert.uid, &alert.comm, &alert.filename, &alert.rule.description
+    );
+
+    match alert.rule.severity {
+        rwatch_common::Severity::Info => info!("[Info]: {}", log_message),
+        rwatch_common::Severity::Warning => warn!("[Warning]: {}".yellow(), log_message),
+        rwatch_common::Severity::Critical => log::error!("[Critical]: {}".red(), log_message)
+    }
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -105,10 +121,7 @@ async fn main() -> anyhow::Result<()> {
                     let alerts = rule_engine.evaluate(&event);
 
                     for alert in alerts {
-                        println!(
-                            "[ALERT] 🚨 PID={} UID={} COMM={} filename={} -- {}",
-                            alert.pid, alert.uid, alert.comm, alert.filename, alert.rule.description
-                        );
+                        log_alert(alert);
                     }
                 }
             }
