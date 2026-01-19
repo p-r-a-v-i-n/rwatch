@@ -16,6 +16,10 @@ rwatch is an eBPF-based threat detection tool written in Rust. It monitors Linux
      - filename, first 2 arguments (argv0, argv1)
      - Streams captured events via PerfEventArray to user space
      - CLI logging for basic visibility
+- **🛡️ Kill Chain Detection**:
+     - Detects `chmod +x` (executable permission) changes on files.
+     - Ignores safe system paths (whitelist: `/bin`, `/usr/bin`, `/lib`, etc.).
+     - Alerts on suspicious activity (e.g., executing a dropped malware script in `/tmp`).
 
 ## 🔜 Planned Features
 - Detect suspicious behaviors like:

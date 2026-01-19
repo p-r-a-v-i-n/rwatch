@@ -11,7 +11,7 @@ pub enum RuleType {
 pub struct Rule {
     pub rule_type: RuleType,
     pub description: String,
-    pub severity: Severity
+    pub severity: Severity,
 }
 
 #[derive(Debug)]
@@ -34,12 +34,12 @@ impl RuleEngine {
                 Rule {
                     rule_type: RuleType::SuspiciousPathPrefix("/tmp".to_string()),
                     description: "Execution from /tmp is suspicious".to_string(),
-                    severity: Severity::Warning
+                    severity: Severity::Warning,
                 },
                 Rule {
                     rule_type: RuleType::SuspiciousCommand("/usr/bin/nmap".to_string()),
                     description: "Port scanning tool detected".to_string(),
-                    severity: Severity::Critical
+                    severity: Severity::Critical,
                 },
             ],
         }
@@ -56,37 +56,34 @@ impl RuleEngine {
         info!("filename={:?} -  comm={:?}", filename_str, comm_str);
         self.rules
             .iter()
-            .filter_map(|rule| {
-                match &rule.rule_type {
-                    RuleType::SuspiciousPathPrefix(prefix) => {
-                        if filename_str.starts_with(prefix) {
-                            Some(Alert {
-                                rule: rule.clone(),
-                                pid: event.pid,
-                                uid: event.uid,
-                                comm: comm_str.clone(),
-                                filename: filename_str.clone(),
-                            })
-                        } else {
-                            None
-                        }
+            .filter_map(|rule| match &rule.rule_type {
+                RuleType::SuspiciousPathPrefix(prefix) => {
+                    if filename_str.starts_with(prefix) {
+                        Some(Alert {
+                            rule: rule.clone(),
+                            pid: event.pid,
+                            uid: event.uid,
+                            comm: comm_str.clone(),
+                            filename: filename_str.clone(),
+                        })
+                    } else {
+                        None
                     }
-                    RuleType::SuspiciousCommand(cmd) => {
-                        if filename_str == *cmd {
-                            Some(Alert {
-                                rule: rule.clone(),
-                                pid: event.pid,
-                                uid: event.uid,
-                                comm: comm_str.clone(),
-                                filename: filename_str.clone(),
-                            })
-                        } else {
-                            None
-                        }
+                }
+                RuleType::SuspiciousCommand(cmd) => {
+                    if filename_str == *cmd {
+                        Some(Alert {
+                            rule: rule.clone(),
+                            pid: event.pid,
+                            uid: event.uid,
+                            comm: comm_str.clone(),
+                            filename: filename_str.clone(),
+                        })
+                    } else {
+                        None
                     }
                 }
             })
             .collect()
     }
-
 }
