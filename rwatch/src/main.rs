@@ -1,18 +1,18 @@
 mod rule_engine;
 
 use aya::maps::perf::{AsyncPerfEventArray, PerfBufferError};
-use aya::programs::TracePoint;
+use aya::programs::{KProbe, TracePoint};
 use aya::util::online_cpus;
 use bytes::BytesMut;
-use tokio::task;
 use colored::Colorize;
+use tokio::task;
 
 use rule_engine::RuleEngine;
 
-use rwatch_common::ExecEvent;
+use rwatch_common::{ChmodEvent, ExecEvent};
 
 #[rustfmt::skip]
-use log::{debug, warn,};
+use log::{debug, warn, info, error};
 use tokio::signal;
 
 use crate::rule_engine::Alert;
@@ -25,8 +25,8 @@ fn log_alert(alert: Alert) {
 
     match alert.rule.severity {
         rwatch_common::Severity::Info => info!("[Info]: {}", log_message),
-        rwatch_common::Severity::Warning => warn!("[Warning]: {}".yellow(), log_message),
-        rwatch_common::Severity::Critical => log::error!("[Critical]: {}".red(), log_message)
+        rwatch_common::Severity::Warning => warn!("[Warning]: {}", log_message.yellow()),
+        rwatch_common::Severity::Critical => error!("[Critical]: {}", log_message.red()),
     }
 }
 
@@ -61,7 +61,17 @@ async fn main() -> anyhow::Result<()> {
     program.load()?;
     program.attach("syscalls", "sys_enter_execve")?;
 
+    let program_chmod: &mut KProbe = ebpf.program_mut("detect_chmod").unwrap().try_into()?;
+    program_chmod.load()?;
+    program_chmod.attach("__x64_sys_chmod", 0)?;
+
+    let program_fchmodat: &mut KProbe = ebpf.program_mut("detect_fchmodat").unwrap().try_into()?;
+    program_fchmodat.load()?;
+    program_fchmodat.attach("__x64_sys_fchmodat", 0)?;
+
     let mut perf_array = AsyncPerfEventArray::try_from(ebpf.take_map("EVENTS").unwrap())?;
+    let mut chmod_perf_array =
+        AsyncPerfEventArray::try_from(ebpf.take_map("CHMOD_EVENTS").unwrap())?;
 
     // for cpu in cpus {
 
@@ -107,8 +117,7 @@ async fn main() -> anyhow::Result<()> {
             loop {
                 let events = buf.read_events(&mut buffers).await?;
 
-                for i in 0..events.read {
-                    let buf = &buffers[i];
+                for buf in buffers.iter().take(events.read) {
 
                     if buf.len() < std::mem::size_of::<ExecEvent>() {
                         continue;
@@ -116,13 +125,55 @@ async fn main() -> anyhow::Result<()> {
 
                     // let ptr = buf.as_ptr() as *const ExecEvent;
 
-                    let event = unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ExecEvent) };
+                    let event =
+                        unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ExecEvent) };
 
                     let alerts = rule_engine.evaluate(&event);
 
                     for alert in alerts {
                         log_alert(alert);
                     }
+                }
+            }
+
+            #[allow(unreachable_code)]
+            Ok::<_, PerfBufferError>(())
+        });
+    }
+
+    // Handle Chmod Events
+    for cpu_id in online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{msg}: {e}"))? {
+        let mut buf = chmod_perf_array.open(cpu_id, None)?;
+
+        task::spawn(async move {
+            let mut buffers = (0..10)
+                .map(|_| BytesMut::with_capacity(1024))
+                .collect::<Vec<_>>();
+
+            loop {
+                let events = buf.read_events(&mut buffers).await?;
+
+                for buf in buffers.iter().take(events.read) {
+
+                    if buf.len() < std::mem::size_of::<ChmodEvent>() {
+                        continue;
+                    }
+
+                    let event =
+                        unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ChmodEvent) };
+
+                    let filename = String::from_utf8_lossy(&event.filename)
+                        .trim_end_matches(char::from(0))
+                        .to_string();
+                    let comm = String::from_utf8_lossy(&event.comm)
+                        .trim_end_matches(char::from(0))
+                        .to_string();
+
+                    let alert_msg = format!(
+                        "[ALERT] Chmod +x detected! File: {}, PID: {}, UID: {}, Comm: {}",
+                        filename, event.pid, event.uid, comm
+                    );
+                    warn!("{}", alert_msg.red().bold());
                 }
             }
 
@@ -138,4 +189,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
