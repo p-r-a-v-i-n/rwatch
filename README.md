@@ -2,7 +2,13 @@
 
 > Real-time threat detection for Linux using eBPF and Rust.
 
-rwatch is a lightweight, high-performance security monitoring tool that uses eBPF to observe system behavior at the kernel level. It detects suspicious activity — such as unexpected process execution, permission changes, network connections, and access to sensitive files — with minimal overhead and no kernel module required.
+rwatch is an eBPF-based threat detection tool written in Rust. It monitors Linux systems for suspicious or malicious behavior with minimal overhead.
+
+## ✨ Why rwatch?
+- Ultra-low overhead with eBPF
+- Written in Rust for safety & performance
+- Real-time event-driven architecture
+- Easy to extend with custom detection rules
 
 ## Features
 
