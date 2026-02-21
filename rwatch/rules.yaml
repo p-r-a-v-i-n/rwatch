@@ -1,0 +1,26 @@
+rules:
+  - rule_type:
+      type: SuspiciousPathPrefix
+      value: "/tmp"
+    description: "Execution from /tmp is suspicious"
+    severity: warning
+  - rule_type:
+      type: SuspiciousPathPrefix
+      value: "/dev/shm"
+    description: "Execution from shared memory is suspicious"
+    severity: warning
+  - rule_type:
+      type: SuspiciousCommand
+      value: "/usr/bin/nmap"
+    description: "Port scanning tool detected"
+    severity: critical
+  - rule_type:
+      type: SuspiciousCommand
+      value: "/usr/bin/nc"
+    description: "Netcat detected (potential reverse shell)"
+    severity: critical
+  - rule_type:
+      type: SuspiciousCommand
+      value: "/usr/bin/python3"
+    description: "Python execution detected"
+    severity: info
