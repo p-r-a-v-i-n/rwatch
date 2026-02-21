@@ -1,0 +1,22 @@
+[Unit]
+Description=rwatch - Real-time Threat Detection using eBPF
+Documentation=https://github.com/p-r-a-v-i-n/rwatch
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rwatch --config /etc/rwatch/rules.yaml --output json
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rwatch
+
+# Security hardening
+NoNewPrivileges=no
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/rwatch
+
+[Install]
+WantedBy=multi-user.target
