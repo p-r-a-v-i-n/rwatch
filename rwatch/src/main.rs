@@ -1,4 +1,5 @@
 mod rule_engine;
+mod webhook;
 
 use aya::maps::perf::{AsyncPerfEventArray, PerfBufferError};
 use aya::programs::{KProbe, TracePoint};
@@ -8,6 +9,8 @@ use clap::Parser;
 use colored::Colorize;
 use std::sync::Arc;
 use tokio::task;
+
+use webhook::WebhookNotifier;
 
 use rule_engine::RuleEngine;
 
@@ -29,6 +32,10 @@ struct Args {
     /// Output format (text, json)
     #[arg(short, long, default_value = "text")]
     output: String,
+
+    /// Webhook URL for alert notifications (overrides config file)
+    #[arg(short, long)]
+    webhook: Option<String>,
 }
 
 /// Format IPv4 address from network byte order u32
@@ -71,6 +78,13 @@ async fn main() -> anyhow::Result<()> {
         warn!("Config file {} not found, loading defaults", args.config);
         rule_engine.load_defaults();
     }
+    // Determine webhook URL: CLI flag takes priority over config file
+    let webhook_url = args
+        .webhook
+        .or_else(|| rule_engine.webhook_url().map(String::from));
+    let notifier: Option<Arc<WebhookNotifier>> =
+        webhook_url.and_then(|url| WebhookNotifier::new(url).map(Arc::new));
+
     let rule_engine = Arc::new(rule_engine);
     let output_format = Arc::new(args.output);
 
@@ -129,6 +143,7 @@ async fn main() -> anyhow::Result<()> {
         let mut buf = perf_array.open(cpu_id, None)?;
         let rule_engine = Arc::clone(&rule_engine);
         let output_format = Arc::clone(&output_format);
+        let notifier = notifier.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -149,6 +164,22 @@ async fn main() -> anyhow::Result<()> {
                     let alerts = rule_engine.evaluate(&event);
 
                     for alert in alerts {
+                        if let Some(ref n) = notifier {
+                            let payload = WebhookNotifier::format_alert(
+                                match alert.rule.severity {
+                                    rwatch_common::Severity::Info => "info",
+                                    rwatch_common::Severity::Warning => "warning",
+                                    rwatch_common::Severity::Critical => "critical",
+                                },
+                                "exec",
+                                &alert.rule.description,
+                                alert.pid,
+                                alert.uid,
+                                &alert.comm,
+                                &[("File", alert.filename.as_str())],
+                            );
+                            n.send(payload);
+                        }
                         log_alert(alert, &output_format);
                     }
                 }
@@ -163,6 +194,7 @@ async fn main() -> anyhow::Result<()> {
     for cpu_id in online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{msg}: {e}"))? {
         let mut buf = chmod_perf_array.open(cpu_id, None)?;
         let output_format = Arc::clone(&output_format);
+        let notifier = notifier.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -206,6 +238,22 @@ async fn main() -> anyhow::Result<()> {
                         );
                         warn!("{}", alert_msg.red().bold());
                     }
+
+                    if let Some(ref n) = notifier {
+                        let payload = WebhookNotifier::format_alert(
+                            "warning",
+                            "chmod",
+                            "Chmod +x detected on suspicious file",
+                            event.pid,
+                            event.uid,
+                            &comm,
+                            &[
+                                ("File", filename.as_str()),
+                                ("Mode", &format!("{:o}", event.mode)),
+                            ],
+                        );
+                        n.send(payload);
+                    }
                 }
             }
 
@@ -218,6 +266,7 @@ async fn main() -> anyhow::Result<()> {
     for cpu_id in online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{msg}: {e}"))? {
         let mut buf = connect_perf_array.open(cpu_id, None)?;
         let output_format = Arc::clone(&output_format);
+        let notifier = notifier.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -260,6 +309,19 @@ async fn main() -> anyhow::Result<()> {
                         );
                         info!("{}", alert_msg.cyan());
                     }
+
+                    if let Some(ref n) = notifier {
+                        let payload = WebhookNotifier::format_alert(
+                            "info",
+                            "connect",
+                            "Outbound TCP connection detected",
+                            event.pid,
+                            event.uid,
+                            &comm,
+                            &[("Destination", &format!("{}:{}", dest_ip, dest_port))],
+                        );
+                        n.send(payload);
+                    }
                 }
             }
 
@@ -272,6 +334,7 @@ async fn main() -> anyhow::Result<()> {
     for cpu_id in online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{msg}: {e}"))? {
         let mut buf = file_perf_array.open(cpu_id, None)?;
         let output_format = Arc::clone(&output_format);
+        let notifier = notifier.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -314,6 +377,19 @@ async fn main() -> anyhow::Result<()> {
                             filename, event.pid, event.uid, comm
                         );
                         error!("{}", alert_msg.red().bold());
+                    }
+
+                    if let Some(ref n) = notifier {
+                        let payload = WebhookNotifier::format_alert(
+                            "critical",
+                            "file_access",
+                            "Sensitive file access detected",
+                            event.pid,
+                            event.uid,
+                            &comm,
+                            &[("File", filename.as_str())],
+                        );
+                        n.send(payload);
                     }
                 }
             }

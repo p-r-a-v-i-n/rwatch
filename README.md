@@ -66,6 +66,35 @@ Options:
   -V, --version          Print version
 ```
 
+## Webhook Alerting
+
+Send real-time alerts to Slack, Discord, Microsoft Teams, or any HTTP endpoint.
+
+### Quick Start (CLI)
+
+```shell
+sudo rwatch --webhook "https://hooks.slack.com/services/T.../B.../xxx"
+```
+
+### YAML Configuration
+
+Add to `rules.yaml`:
+
+```yaml
+alerting:
+  webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  min_severity: warning
+```
+
+### Payload Format
+
+Payloads are Slack-compatible JSON:
+```json
+{
+  "text": "🚨 *[CRITICAL]* Sensitive file access detected\nPID: 1234 | UID: 0 | Comm: cat\nFile: /etc/shadow"
+}
+```
+
 ## Rules Configuration
 
 Detection rules are defined in YAML. Example `rules.yaml`:
@@ -125,7 +154,7 @@ Additional macOS dependencies:
 ## Roadmap
 
 - [ ] Event correlation and kill-chain detection
-- [ ] Webhook / Slack alerting
+- [x] Webhook / Slack alerting
 - [ ] Log file rotation
 - [ ] Container-aware detection (cgroup/namespace tracking)
 - [ ] Event debouncing to reduce log noise

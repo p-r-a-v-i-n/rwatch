@@ -27,26 +27,49 @@ pub struct Alert {
     pub filename: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AlertingConfig {
+    pub webhook_url: Option<String>,
+    pub min_severity: Option<Severity>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RulesConfig {
     pub rules: Vec<Rule>,
+    pub alerting: Option<AlertingConfig>,
 }
 
 pub struct RuleEngine {
     rules: Vec<Rule>,
+    alerting: Option<AlertingConfig>,
 }
 
 impl RuleEngine {
     pub fn new() -> Self {
-        Self { rules: Vec::new() }
+        Self {
+            rules: Vec::new(),
+            alerting: None,
+        }
     }
 
     pub fn load_from_file<P: AsRef<Path>>(&mut self, path: P) -> anyhow::Result<()> {
         let content = fs::read_to_string(path)?;
         let config: RulesConfig = serde_yaml::from_str(&content)?;
         self.rules = config.rules;
+        self.alerting = config.alerting;
         info!("Loaded {} rules from configuration", self.rules.len());
+        if let Some(ref alerting) = self.alerting {
+            if alerting.webhook_url.is_some() {
+                info!("Webhook alerting configured from rules file");
+            }
+        }
         Ok(())
+    }
+
+    pub fn webhook_url(&self) -> Option<&str> {
+        self.alerting
+            .as_ref()
+            .and_then(|a| a.webhook_url.as_deref())
     }
 
     pub fn load_defaults(&mut self) {
