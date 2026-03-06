@@ -11,7 +11,7 @@ use aya_ebpf::{
     programs::{ProbeContext, TracePointContext},
 };
 
-use aya_log_ebpf::info;
+
 
 use rwatch_common::{ChmodEvent, ConnectEvent, ExecEvent, FileAccessEvent};
 
@@ -38,7 +38,7 @@ pub fn rwatch(ctx: TracePointContext) -> u32 {
 }
 
 fn try_rwatch(ctx: TracePointContext) -> Result<u32, u32> {
-    info!(&ctx, "DEBUG: Execve HIT");
+
     let pid_tgid = bpf_get_current_pid_tgid();
     let pid = (pid_tgid >> 32) as u32;
 

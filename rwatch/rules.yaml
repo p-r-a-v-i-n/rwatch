@@ -24,3 +24,10 @@ rules:
       value: "/usr/bin/python3"
     description: "Python execution detected"
     severity: info
+
+# Optional: Webhook alerting configuration
+# Uncomment and set your webhook URL to enable alerts.
+# alerting:
+#   webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+#   min_severity: warning
+
